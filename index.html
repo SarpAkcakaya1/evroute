@@ -1,199 +1,347 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
   <meta charset="utf-8" />
-  <title>EVRoute Gelişmiş</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+  <title>EVRoute – Ayarlar & Araç Bilgisi</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <!-- MarkerCluster CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css"/>
   <style>
-    body { font-family: Arial; padding: 20px; }
-    #map { height: 600px; width: 100%; margin-bottom: 15px; }
-    #controls { margin-bottom: 20px; }
-    #energy-info { padding: 15px; border: 1px solid #ccc; background: #f9f9f9; }
-    input, select, button { margin: 5px; padding: 6px; }
+    body, html { margin:0; padding:0; height:100%; font-family:Arial, sans-serif }
+    #map { width:100%; height:100% }
+    /* üst panel */
+    .top-panel {
+      position:absolute; top:10px; left:50%; transform:translateX(-50%);
+      background:rgba(255,255,255,0.9); padding:8px 12px;
+      border-radius:6px; display:flex; gap:8px; flex-wrap:wrap; z-index:1000;
+    }
+    .top-panel input {
+      padding:6px; font-size:14px;
+      border:1px solid #ccc; border-radius:4px;
+      width:180px; position: relative;
+    }
+    .top-panel button {
+      padding:6px 12px; font-size:14px;
+      border:none; border-radius:4px;
+      background:#007bff; color:#fff; cursor:pointer;
+    }
+    .top-panel button:disabled { background:#aaa; cursor:not-allowed }
+
+    /* Autocomplete öneri kutusu */
+    .autocomplete-list {
+      position:absolute;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-top: none;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 1001;
+      width: auto;
+    }
+    .autocomplete-item {
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .autocomplete-item:hover {
+      background: #f0f0f0;
+    }
+
+    /* Ayarlar butonu ve paneli */
+    #settingsToggle {
+      position:absolute; top:10px; right:10px; z-index:1000;
+      background:rgba(255,255,255,0.9); border:none; padding:8px;
+      border-radius:4px; cursor:pointer; font-size:18px;
+    }
+    .settings-panel {
+      position:absolute; top:50px; right:10px; z-index:1000;
+      background:#fff; width:300px; max-height:80%;
+      overflow-y:auto; padding:12px; border-radius:6px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.3); display:none;
+    }
+    .settings-panel h3 { margin-top:0 }
+    .settings-panel label { display:block; margin-top:8px; font-size:14px }
+    .settings-panel input {
+      width:100%; padding:6px; margin-top:4px;
+      border:1px solid #ccc; border-radius:4px;
+    }
+    .settings-panel button { margin-top:10px; width:48%; padding:6px; border:none; border-radius:4px; cursor:pointer }
+    #addVehBtn { background:#28a745; color:#fff }
+    #clearVehBtn { background:#ffc107; color:#000 }
+
+    .vehicle-list {
+      margin-top:12px; list-style:none; padding:0;
+    }
+    .vehicle-list li {
+      display:flex; justify-content:space-between; align-items:center;
+      padding:6px 4px; border-bottom:1px solid #eee; cursor:pointer;
+    }
+    .vehicle-list li:last-child { border-bottom:none }
+    .vehicle-list button {
+      background:#dc3545; border:none; color:#fff;
+      padding:4px 8px; border-radius:4px; cursor:pointer;
+    }
+
+    /* Seçili araç kutusu */
+    .vehicle-info {
+      position:absolute; top:10px; left:10px; z-index:1000;
+      background:rgba(255,255,255,0.9); padding:10px;
+      border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.3);
+      font-size:14px; max-width:220px;
+    }
+
+    /* Enerji info panel */
+    #infoPanel {
+      position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
+      background:rgba(255,255,255,0.9); padding:10px; border-radius:6px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.3); font-size:14px;
+      max-width:600px; z-index:1000;
+    }
   </style>
 </head>
 <body>
-  <h2>⚡ EVRoute Gelişmiş</h2>
-
-  <div id="controls">
-    <h3>🚗 Araç Ekle</h3>
-    <input type="text" id="vehicleName" placeholder="Araç Adı" />
-    <input type="number" id="vehicleWeight" placeholder="Ağırlık (kg)" />
-    <input type="number" id="consumptionRate" placeholder="Tüketim (Wh/km)" />
-    <input type="number" id="batteryCapacity" placeholder="Batarya (kWh)" />
-    <button onclick="addVehicle()">➕ Ekle</button>
-
-    <h3>🔧 Araç Seç</h3>
-    <select id="vehicleSelect"></select>
-    <button onclick="calculateRoute()">🚙 Rota Hesapla</button>
-  </div>
 
   <div id="map"></div>
-  <div id="energy-info">🔋 Enerji verileri bekleniyor...</div>
 
+  <!-- Nereden/Nereye -->
+  <div class="top-panel">
+    <div style="position:relative;">
+      <input id="fromInput" placeholder="Nereden..." autocomplete="off"/>
+    </div>
+    <div style="position:relative;">
+      <input id="toInput" placeholder="Nereye..." autocomplete="off"/>
+    </div>
+    <button id="routeBtn" disabled>🚙 Rota Hesapla</button>
+  </div>
+
+  <!-- Araçlarım ayarları -->
+  <button id="settingsToggle" title="Araçlarım ⚙️">⚙️</button>
+  <div class="settings-panel" id="settingsPanel">
+    <h3>Araçlarım</h3>
+    <label>Araç Adı<input id="vehName" type="text"/></label>
+    <label>Ağırlık (kg)<input id="vehWeight" type="number"/></label>
+    <label>Tüketim (Wh/km)<input id="vehRate" type="number"/></label>
+    <label>Batarya (kWh)<input id="vehBattery" type="number"/></label>
+    <div style="display:flex; justify-content:space-between;">
+      <button id="addVehBtn">➕ Ekle</button>
+      <button id="clearVehBtn">📋 Temizle</button>
+    </div>
+    <ul class="vehicle-list" id="vehList"></ul>
+  </div>
+
+  <!-- Seçili araç bilgisi -->
+  <div class="vehicle-info" id="vehInfo">
+    <em>Henüz araç seçilmedi.</em>
+  </div>
+
+  <!-- Enerji Sonuçları -->
+  <div id="infoPanel">🔋 Enerji verileri burada görünür.</div>
+
+  <!-- Leaflet & MarkerCluster JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
-  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-
   <script>
-    const map = L.map('map').setView([41.0082, 28.9784], 10);
-    let startCoords = null;
-    let endCoords = null;
-    let startMarker, endMarker;
-    let routePolyline = null;
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
+    // --- Harita Kurulum ---
+    const map = L.map('map').setView([41.0082,28.9784],10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      attribution:'&copy; OpenStreetMap'
     }).addTo(map);
 
-    // 📍 Adres girme
-    L.Control.geocoder({
-      defaultMarkGeocode: false,
-      placeholder: "Başlangıç Adresi"
-    }).on('markgeocode', e => {
-      if (startMarker) map.removeLayer(startMarker);
-      startCoords = [e.geocode.center.lat, e.geocode.center.lng];
-      startMarker = L.marker(startCoords).addTo(map).bindPopup("Başlangıç").openPopup();
-      map.setView(startCoords, 14);
-    }).addTo(map);
+    // MarkerCluster ve ikon tanımı
+    const stationsCluster = L.markerClusterGroup();
+    const stationIcon = L.icon({
+      iconUrl: 'https://img.icons8.com/office/40/000000/charging-station.png',
+      iconSize: [32,32],
+      iconAnchor: [16,32]
+    });
+    map.addLayer(stationsCluster);
 
-    L.Control.geocoder({
-      defaultMarkGeocode: false,
-      placeholder: "Bitiş Adresi",
-      position: 'topleft'
-    }).on('markgeocode', e => {
-      if (endMarker) map.removeLayer(endMarker);
-      endCoords = [e.geocode.center.lat, e.geocode.center.lng];
-      endMarker = L.marker(endCoords).addTo(map).bindPopup("Bitiş").openPopup();
-      map.setView(endCoords, 14);
-    }).addTo(map);
+    let fromMarker, toMarker, routeLine, fromCoord = null, toCoord = null;
 
-    // 🚗 Araç ekleme
-    function addVehicle() {
-      const name = document.getElementById("vehicleName").value;
-      const weight = parseFloat(document.getElementById("vehicleWeight").value);
-      const rate = parseFloat(document.getElementById("consumptionRate").value);
-      const battery = parseFloat(document.getElementById("batteryCapacity").value);
+    const fromInput      = document.getElementById('fromInput'),
+          toInput        = document.getElementById('toInput'),
+          routeBtn       = document.getElementById('routeBtn'),
+          infoPanel      = document.getElementById('infoPanel'),
+          vehInfo        = document.getElementById('vehInfo'),
+          settingsToggle = document.getElementById('settingsToggle'),
+          settingsPanel  = document.getElementById('settingsPanel'),
+          addVehBtn      = document.getElementById('addVehBtn'),
+          clearVehBtn    = document.getElementById('clearVehBtn'),
+          vehList        = document.getElementById('vehList');
 
-      if (!name || isNaN(weight) || isNaN(rate) || isNaN(battery)) {
-        alert("Tüm alanları doğru doldurun.");
-        return;
-      }
+    // Ayarlar paneli aç/kapa
+    settingsToggle.onclick = () => {
+      settingsPanel.style.display = settingsPanel.style.display === 'block' ? 'none' : 'block';
+    };
 
-      const vehicle = { name, weight, rate, battery };
-      const vehicles = JSON.parse(localStorage.getItem("vehicles") || "[]");
-      vehicles.push(vehicle);
-      localStorage.setItem("vehicles", JSON.stringify(vehicles));
-      loadVehicles();
-    }
-
-    // 🚙 Araç listesini yükle
-    function loadVehicles() {
-      const select = document.getElementById("vehicleSelect");
-      select.innerHTML = "";
-      const vehicles = JSON.parse(localStorage.getItem("vehicles") || "[]");
-      vehicles.forEach((v, i) => {
-        const opt = document.createElement("option");
-        opt.value = i;
-        opt.textContent = `${v.name} (${v.battery} kWh)`;
-        select.appendChild(opt);
-      });
-    }
-
-    // 📏 Rota ve enerji hesapla
-    function calculateRoute() {
-      if (!startCoords || !endCoords) {
-        alert("Lütfen başlangıç ve bitiş noktalarını seçin.");
-        return;
-      }
-
-      const vehicles = JSON.parse(localStorage.getItem("vehicles") || "[]");
-      const selected = document.getElementById("vehicleSelect").value;
-      const vehicle = vehicles[selected];
-
-      if (!vehicle) {
-        alert("Lütfen geçerli bir araç seçin.");
-        return;
-      }
-
-      fetch("http://127.0.0.1:8000/route", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          start_lat: startCoords[0],
-          start_lon: startCoords[1],
-          end_lat: endCoords[0],
-          end_lon: endCoords[1]
-        })
-      })
-      .then(res => res.json())
-      .then(routeData => {
-        if (routePolyline) map.removeLayer(routePolyline);
-        routePolyline = L.polyline(routeData.route_coordinates, { color: 'blue' }).addTo(map);
-
-        return fetch("http://127.0.0.1:8000/calculate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            distance_km: routeData.distance_km,
-            elevation_gain_m: routeData.elevation_gain_m,
-            vehicle_weight_kg: vehicle.weight,
-            extra_load_kg: 100,
-            consumption_rate_wh_per_km: vehicle.rate,
-            battery_capacity_kwh: vehicle.battery
-          })
-        });
-      })
-      .then(res => res.json())
-      .then(energyData => {
-        document.getElementById("energy-info").innerHTML = `
-          🔋 <strong>Enerji Gereksinimi:</strong> ${energyData.energy_needed_wh} Wh<br>
-          <strong>Batarya Yeterli mi?:</strong> ${energyData.battery_ok ? '✅ EVET' : '❌ HAYIR'}<br>
-          💡 <strong>Kalan Batarya:</strong> 
-          ${energyData.battery_remaining_percent < 0 ? '❌ YETERSİZ – Şarj Gerekli' : energyData.battery_remaining_percent + '%'}
-        `;
-      })
-      .catch(err => {
-        console.error(err);
-        alert("Hata oluştu: " + err.message);
-      });
-    }
-
-    // ⚡ Şarj istasyonlarını yükle
-    fetch("http://127.0.0.1:8000/api/sarj")
-      .then(res => res.json())
-      .then(data => {
-        const stations = data.stations || [];
-        const cluster = L.markerClusterGroup();
-
-        stations.forEach(st => {
-          const lat = st.geoLocation?.lat;
-          const lon = st.geoLocation?.lon;
-          const id = st.id;
-          const name = st.name || "İsimsiz İstasyon";
-          const operatorId = st.operator?.id || "-";
-          const socketCount = st.socketCount || 0;
-
-          if (lat && lon) {
-            cluster.addLayer(
-              L.marker([lat, lon]).bindPopup(` 
-                <b>${name}</b><br>
-                🆔 ID: ${id}<br>
-                🧑‍💼 Operatör ID: ${operatorId}<br>
-                🔌 Soket Sayısı: ${socketCount}
-              `)
-            );
+    // --- Autocomplete fonksiyonu ---
+    function setupAutocomplete(input, callback){
+      let timer, list;
+      input.addEventListener('input', () => {
+        clearTimeout(timer);
+        const q = input.value.trim();
+        if (!q) {
+          if (list) list.style.display = 'none';
+          return;
+        }
+        timer = setTimeout(async () => {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(q)}`
+          ).then(r => r.json());
+          if (!list) {
+            list = document.createElement('div');
+            list.className = 'autocomplete-list';
+            input.parentNode.append(list);
           }
-        });
-
-        map.addLayer(cluster);
+          list.innerHTML = '';
+          res.forEach(loc => {
+            const item = document.createElement('div');
+            item.className = 'autocomplete-item';
+            item.textContent = loc.display_name;
+            item.onclick = () => {
+              input.value = loc.display_name;
+              list.style.display = 'none';
+              callback([+loc.lat, +loc.lon], loc.display_name);
+              routeBtn.disabled = !(fromCoord && toCoord);
+            };
+            list.append(item);
+          });
+          list.style.top   = input.offsetHeight + 'px';
+          list.style.left  = '0px';
+          list.style.width = '100%';
+          list.style.display = res.length ? 'block' : 'none';
+        }, 300);
       });
+      document.addEventListener('click', e => {
+        if (e.target !== input && list) list.style.display = 'none';
+      });
+    }
 
-    // 🚗 Araçları ilk yükle
+    // Nereden / Nereye için autocomplete
+    setupAutocomplete(fromInput, (coord, name) => {
+      fromCoord = coord;
+      if (fromMarker) map.removeLayer(fromMarker);
+      fromMarker = L.marker(coord).addTo(map).bindPopup('Başlangıç:<br>' + name).openPopup();
+    });
+    setupAutocomplete(toInput, (coord, name) => {
+      toCoord = coord;
+      if (toMarker) map.removeLayer(toMarker);
+      toMarker = L.marker(coord).addTo(map).bindPopup('Bitiş:<br>' + name).openPopup();
+    });
+
+    // --- Araç Yönetimi ---
+    function saveVehicles(arr) {
+      localStorage.setItem('vehArr', JSON.stringify(arr));
+    }
+    function loadVehicles() {
+      const arr = JSON.parse(localStorage.getItem('vehArr') || '[]');
+      vehList.innerHTML = '';
+      arr.forEach((v, i) => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <div><strong>${v.name}</strong><br>
+            ${v.weight}kg · ${v.rate}Wh/km · ${v.battery}kWh
+          </div>
+          <button data-i="${i}">❌</button>
+        `;
+        li.querySelector('button').onclick = () => {
+          arr.splice(i, 1);
+          saveVehicles(arr);
+          loadVehicles();
+        };
+        li.onclick = () => {
+          selectVehicle(i);
+          settingsPanel.style.display = 'none';
+        };
+        vehList.append(li);
+      });
+      if (arr.length) selectVehicle(0);
+      else vehInfo.innerHTML = '<em>Henüz araç eklenmedi.</em>';
+    }
+    function selectVehicle(i) {
+      const arr = JSON.parse(localStorage.getItem('vehArr') || '[]');
+      const v = arr[i];
+      vehInfo.innerHTML = `
+        <b>${v.name}</b><br>
+        Ağırlık: ${v.weight} kg<br>
+        Tüketim: ${v.rate} Wh/km<br>
+        Batarya: ${v.battery} kWh
+      `;
+      vehInfo.dataset.sel = i;
+    }
+    addVehBtn.onclick = () => {
+      const n = document.getElementById('vehName').value.trim(),
+            w = +document.getElementById('vehWeight').value,
+            r = +document.getElementById('vehRate').value,
+            b = +document.getElementById('vehBattery').value;
+      if (!n||!w||!r||!b) return alert('Tüm araç alanlarını doldurun');
+      const arr = JSON.parse(localStorage.getItem('vehArr') || '[]');
+      arr.push({ name: n, weight: w, rate: r, battery: b });
+      saveVehicles(arr);
+      document.querySelectorAll('.settings-panel input').forEach(i=>i.value='');
+      loadVehicles();
+    };
+    clearVehBtn.onclick = () => {
+      if (confirm('Tüm araçlar silinsin mi?')) {
+        saveVehicles([]);
+        loadVehicles();
+      }
+    };
     loadVehicles();
+
+    // --- Rota & Enerji Hesapla ---
+    routeBtn.onclick = async () => {
+      if (routeLine) map.removeLayer(routeLine);
+      const v = JSON.parse(localStorage.getItem('vehArr') || '[]')[+vehInfo.dataset.sel];
+      const resp = await fetch('http://127.0.0.1:8000/route', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          start_lat: fromCoord[0], start_lon: fromCoord[1],
+          end_lat:   toCoord[0],   end_lon:   toCoord[1]
+        })
+      }).then(r=>r.json());
+      routeLine = L.polyline(resp.route_coordinates, { color:'blue', weight:4 }).addTo(map);
+      map.fitBounds(routeLine.getBounds(), { padding:[40,40] });
+      const en = await fetch('http://127.0.0.1:8000/calculate', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          distance_km: resp.distance_km,
+          elevation_gain_m: resp.elevation_gain_m,
+          vehicle_weight_kg: v.weight,
+          extra_load_kg: 0,
+          consumption_rate_wh_per_km: v.rate,
+          battery_capacity_kwh: v.battery
+        })
+      }).then(r=>r.json());
+      infoPanel.innerHTML = `
+        🔋 <b>Gereksinim:</b> ${en.energy_needed_wh.toLocaleString()} Wh<br>
+        <b>Yeterli mi?:</b> ${en.battery_ok ? '✅ EVET' : '❌ HAYIR'}<br>
+        💡 <b>Kalan Batarya:</b> ${en.battery_remaining_percent.toFixed(2)}%
+      `;
+    };
+
+    // --- Şarj İstasyonlarını Yükle ---
+    async function loadStations() {
+      const js = await fetch('http://127.0.0.1:8000/api/sarj').then(r=>r.json());
+      stationsCluster.clearLayers();
+      (js.stations||[]).forEach(st => {
+        if (!st.geoLocation) return;
+        stationsCluster.addLayer(
+          L.marker(
+            [st.geoLocation.lat, st.geoLocation.lon],
+            { icon: stationIcon }
+          ).bindPopup(`
+            <b>ID:</b> ${st.id}<br>
+            <b>Operatör:</b> ${st.operator?.id||'-'}<br>
+            <b>Soket:</b> ${st.socketCount||0}
+          `)
+        );
+      });
+    }
+    loadStations();
   </script>
 </body>
 </html>

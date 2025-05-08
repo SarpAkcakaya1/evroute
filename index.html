@@ -151,13 +151,15 @@
     }).addTo(map);
 
     // MarkerCluster ve ikon tanımı
-    const stationsCluster = L.markerClusterGroup();
-    const stationIcon = L.icon({
-      iconUrl: 'https://img.icons8.com/office/40/000000/charging-station.png',
-      iconSize: [32,32],
-      iconAnchor: [16,32]
-    });
-    map.addLayer(stationsCluster);
+const stationsCluster = L.markerClusterGroup();
+const stationIcon = L.divIcon({
+  html: '🚗⚡',
+  className: '',
+  iconSize: [100, 100],
+  iconAnchor: [16, 32]
+});
+map.addLayer(stationsCluster);
+
 
     let fromMarker, toMarker, routeLine, fromCoord = null, toCoord = null;
 
